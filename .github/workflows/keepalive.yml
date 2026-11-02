@@ -27,8 +27,9 @@ jobs:
             if [ -z "$url" ] || [ -z "$key" ]; then
               echo "$name: secrets missing, skipped"; fail=1; return
             fi
+            base="${url%/}"; base="${base%/rest/v1}"
             code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
-              -H "apikey: $key" -H "Authorization: Bearer $key" "${url%/}/rest/v1/")
+              -H "apikey: $key" -H "Authorization: Bearer $key" "$base/rest/v1/")
             echo "$name: HTTP $code"
             # 2xx-4xx means the project answered. 5xx or 000 means it is down, paused or unreachable.
             case "$code" in
