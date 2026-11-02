@@ -1,0 +1,41 @@
+name: Supabase keep-alive
+
+# Pings each Supabase project every 3 days so free projects are not paused for inactivity.
+# Reads only: one GET request per project. No data is written.
+on:
+  schedule:
+    - cron: "17 13 */3 * *"   # 13:17 UTC every 3rd day
+  workflow_dispatch: {}        # lets you run it by hand to test
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping projects
+        env:
+          SENTINELOS_URL: ${{ secrets.SENTINELOS_URL }}
+          SENTINELOS_ANON_KEY: ${{ secrets.SENTINELOS_ANON_KEY }}
+          NORTHSTAR_URL: ${{ secrets.NORTHSTAR_URL }}
+          NORTHSTAR_ANON_KEY: ${{ secrets.NORTHSTAR_ANON_KEY }}
+        run: |
+          fail=0
+          ping() {
+            name="$1"; url="$2"; key="$3"
+            if [ -z "$url" ] || [ -z "$key" ]; then
+              echo "$name: secrets missing, skipped"; fail=1; return
+            fi
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
+              -H "apikey: $key" -H "Authorization: Bearer $key" "${url%/}/rest/v1/")
+            echo "$name: HTTP $code"
+            # 2xx-4xx means the project answered. 5xx or 000 means it is down, paused or unreachable.
+            case "$code" in
+              2*|3*|4*) ;;
+              *) fail=1 ;;
+            esac
+          }
+          ping sentinelos "$SENTINELOS_URL" "$SENTINELOS_ANON_KEY"
+          ping northstar-site "$NORTHSTAR_URL" "$NORTHSTAR_ANON_KEY"
+          exit $fail
